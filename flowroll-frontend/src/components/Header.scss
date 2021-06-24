@@ -1,0 +1,35 @@
+$header-height: 50px;
+.header {
+  width: 100vw;
+  min-height: $header-height;
+  background-color: #6136BD;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  .logo-wrapper {
+    background-color: black;
+    width: $header-height;
+    height: $header-height;
+    img {
+      width: $header-height;
+      height: $header-height; 
+    }
+  }
+  .header-content {
+    padding-left: 30px;
+    padding-right: 40px;
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    .tokens {
+      text-decoration: underline;
+      font-weight: bold;
+    }
+    .connect-wallet-btn {
+      height: $header-height - 10px;
+      margin: auto;
+      margin-right: 0;
+    }
+  }
+
+}

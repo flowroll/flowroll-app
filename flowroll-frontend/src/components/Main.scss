@@ -1,0 +1,15 @@
+.main {
+  background-color: "#F8F6F9";
+  width: 80vw;
+  margin: auto;
+  h1.flows-title {
+    display: inline-block;
+  }
+  .add-box-icon {
+    cursor: pointer;
+    margin-left: 10px;
+    &:hover {
+      color: purple;
+    }
+  }
+}
