@@ -5,7 +5,7 @@ import { useState } from 'react';
 import ModalAddFlow from './ModalAddFlow';
 import './Main.scss';
 
-function Main() {
+function Main(props) {
   const [modalOpen, setModalOpen] = useState(false);
   const [filters, setFilters] = useState({
     inflow: false,
@@ -23,7 +23,7 @@ function Main() {
     <div className="main">
       <h1 className="flows-title">Flows</h1>
       <span className="add-box-icon" onClick={()=> setModalOpen(!modalOpen)}><AddBoxIcon/></span>
-      <ModalAddFlow show={modalOpen} onHide={() => setModalOpen(false)}/>
+      <ModalAddFlow currUser={props.currUser} show={modalOpen} onHide={() => setModalOpen(false)}/>
       <div className="filter-block">
         <span>Filters:</span>
         <Button size="sm" variant="outline-primary" className="ml-2" active={filters.inflow} onClick={() => toggleFilter('inflow')}>Inflow</Button>

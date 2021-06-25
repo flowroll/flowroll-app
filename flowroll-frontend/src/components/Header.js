@@ -1,6 +1,6 @@
 import './Header.scss';
 import logo from '../logo.svg';
-function Header() {
+function Header(props) {
   return (
     <header className="header">
       <div className="logo-wrapper">
@@ -10,7 +10,9 @@ function Header() {
         <div className="tokens">
           <p>Dai</p>
         </div>
-        <button className="connect-wallet-btn">Connect Wallet</button>
+        {props.account ? <p style={{color: 'white'}}>{props.account}</p> :
+          <button className="connect-wallet-btn" onClick={() => props.connect()}>Connect Wallet</button> }
+        
       </div>
     </header>
   );

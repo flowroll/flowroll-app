@@ -1,7 +1,6 @@
 import { Component } from 'react';
 import { Modal, Button, Form } from 'react-bootstrap';
 
-import NETWORK_ADDRESSES from '../networkAddresses.json';
 
 class ModalAddFlow extends Component {
 
@@ -17,7 +16,7 @@ class ModalAddFlow extends Component {
     this.handleFormChange = this.handleFormChange.bind(this);
   }
 
-  handleSubmit = (event) => {
+  handleSubmit = async (event) => {
     event.preventDefault();
     
     const formData = {
@@ -28,10 +27,18 @@ class ModalAddFlow extends Component {
     console.log(formData)
 
     //make contract call here
-
+    try {
+      await this.props.currUser.flow({
+        recipient: '0x3905A1CfAe9d84fC25DffEF042f10f07Be9A7d06',
+        flowRate: '0'
+      });
 
     //if successful close
     this.props.onHide();
+    } catch(err){
+      console.error(err);
+    }
+ 
   };
 
   handleFormChange = (event) => {
@@ -41,7 +48,8 @@ class ModalAddFlow extends Component {
   render(){
     return (
       <Modal
-        {...this.props}
+        show={this.props.show}
+        onHide={this.props.onHide}
         aria-labelledby="contained-modal-title-vcenter"
         centered
       >
@@ -72,8 +80,8 @@ class ModalAddFlow extends Component {
         </Form>
       </Modal.Body>
     </Modal>
-  )
-    }
+   )
+  }
 }
 
 export default ModalAddFlow;
