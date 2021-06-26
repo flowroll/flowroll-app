@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.7.0;
+pragma solidity ^0.7.5;
 pragma experimental ABIEncoderV2;
 
 import {
@@ -18,6 +18,10 @@ import {
     SuperAppBase
 } from "@superfluid-finance/ethereum-contracts/contracts/apps/SuperAppBase.sol";
 
+import { SafeMath } from "@openzeppelin/contracts/math/SafeMath.sol";
+
+import "hardhat/console.sol";
+
 contract FlowRoller is SuperAppBase {
 
     struct Saver {
@@ -26,6 +30,8 @@ contract FlowRoller is SuperAppBase {
         uint256 prevAccumulatedBalance;
         bool isTerminated;
     }
+
+    using SafeMath for uint256;
 
     mapping(address => Saver) public savers;
 
@@ -66,12 +72,19 @@ contract FlowRoller is SuperAppBase {
         returns(bytes memory newCtx) 
     {
         newCtx = ctx;
+        
+        console.logBytes32(agreementId);
         (address from,) = abi.decode(agreementData, (address, address));
         (uint256 timestamp, int96 flowRate,,) = _cfa.getFlowByID(_superToken, agreementId);
+        console.log("updatedTimestamp");
+        console.logUint(timestamp);
+        console.log("updatedFlowRate");
+        console.logInt(flowRate);
+
+        getBalance(from);
 
         savers[from].timestamp = timestamp;
         savers[from].flowRate = flowRate;
-        savers[from].prevAccumulatedBalance = 0;
         savers[from].isTerminated = false;
     }
 
@@ -83,6 +96,9 @@ contract FlowRoller is SuperAppBase {
         returns(bytes memory newCtx) 
     {
         newCtx = ctx;
+
+        console.logBytes32(agreementId);
+
         (address from,) = abi.decode(agreementData, (address, address));
 
         uint256 prevTimestamp = savers[from].timestamp;
@@ -90,8 +106,26 @@ contract FlowRoller is SuperAppBase {
 
         (uint256 updatedTimestamp, int96 updatedFlowRate,,) = _cfa.getFlowByID(_superToken, agreementId);
 
-        uint256 timeDelta = updatedTimestamp - prevTimestamp;
-        uint256 newAccumulatedBalance = savers[from].prevAccumulatedBalance + (timeDelta * uint256(prevFlowRate));
+        if (updatedFlowRate == 0) {
+            // Flow has been terminated
+            // Get timestamp from 'ctx' instead - flowData object timestamp will be 0
+            // TODO: send accumulated to AAVE here;
+            console.log("deleting flow...");
+            savers[from].isTerminated = true;
+            ISuperfluid.Context memory ctxDecoded = _host.decodeCtx(ctx);
+            updatedTimestamp = ctxDecoded.timestamp;
+        }
+        console.log("updatedTimestamp");
+        console.logUint(updatedTimestamp);
+        console.log("updatedFlowRate");
+        console.logInt(updatedFlowRate);
+
+        uint256 timeDelta = updatedTimestamp.sub(prevTimestamp);
+        uint256 newAccumulatedBalance = savers[from].prevAccumulatedBalance.add(timeDelta.mul(uint256(prevFlowRate)));
+        console.log("prevAccumulatedBalance");
+        console.logUint(newAccumulatedBalance);
+
+        getBalance(from);
 
         // Update balance
         savers[from].prevAccumulatedBalance = newAccumulatedBalance;
@@ -99,16 +133,23 @@ contract FlowRoller is SuperAppBase {
         // Update other properties
         savers[from].timestamp = updatedTimestamp;
         savers[from].flowRate = updatedFlowRate;
-        
-        if (updatedFlowRate == 0) {
-            savers[from].isTerminated = true;
-            
-            // TODO: send accumulated to AAVE here;
-        }
-        else {
-            savers[from].isTerminated = false;
-        }
+    
     }
+
+    function getBalance(
+        address from) 
+        private
+        returns(uint256 balance) 
+    {
+        // (int256 balance,,) = _cfa.realtimeBalanceOf(_superToken, from, block.timestamp);
+        // (int256 balance,,,) = ISuperToken(_superToken).realtimeBalanceOfNow(from);
+        balance = ISuperToken(_superToken).balanceOf(address(this));
+        console.log("real time balance");
+        console.logUint(balance);
+
+        return balance;
+    }
+
 
     /**************************************************************************
      * SuperApp callbacks
@@ -129,6 +170,7 @@ contract FlowRoller is SuperAppBase {
     onlyExpected(superToken, agreementClass)
     returns (bytes memory newCtx)
     {
+        console.log("afterAgreementCreated called");
         return _initiateSaver(ctx, agreementData, agreementId);
     }
 
@@ -146,6 +188,7 @@ contract FlowRoller is SuperAppBase {
     onlyExpected(superToken, agreementClass)
     returns (bytes memory newCtx)
     {
+        console.log("afterAgreementUpdated called");
         return _updateSaver(ctx, agreementData, agreementId);
     }
 
@@ -161,6 +204,7 @@ contract FlowRoller is SuperAppBase {
     override
     onlyHost
     returns (bytes memory newCtx) {
+        console.log("afterAgreementTerminated called");
         return _updateSaver(ctx, agreementData, agreementId);
     }
 

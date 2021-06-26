@@ -1,0 +1,16 @@
+{
+  "name": "flowroll",
+  "devDependencies": {
+    "@nomiclabs/hardhat-ethers": "^2.0.0",
+    "@nomiclabs/hardhat-waffle": "^2.0.0",
+    "chai": "^4.2.0",
+    "ethereum-waffle": "^3.0.0",
+    "ethers": "^5.0.0",
+    "hardhat": "^2.4.1"
+  },
+  "dependencies": {
+    "@alch/alchemy-web3": "^1.1.1",
+    "@superfluid-finance/ethereum-contracts": "^1.0.0-rc.4",
+    "@superfluid-finance/js-sdk": "^0.4.3"
+  }
+}
