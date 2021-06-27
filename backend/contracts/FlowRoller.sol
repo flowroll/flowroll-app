@@ -18,6 +18,18 @@ import {
     SuperAppBase
 } from "@superfluid-finance/ethereum-contracts/contracts/apps/SuperAppBase.sol";
 
+import {
+    ILendingPool
+} from "../interfaces/ILendingPool.sol";
+
+import {
+    ILendingPoolAddressesProvider
+} from "../interfaces/ILendingPoolAddressesProvider.sol";
+
+import {
+    IERC20
+} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
 import { SafeMath } from "@openzeppelin/contracts/math/SafeMath.sol";
 
 import "hardhat/console.sol";
@@ -38,19 +50,23 @@ contract FlowRoller is SuperAppBase {
     ISuperfluid private _host; // host
     IConstantFlowAgreementV1 public immutable _cfa;
     ISuperToken public immutable _superToken;
+    ILendingPoolAddressesProvider private _aaveLendingPoolProvider;
 
     constructor(
         ISuperfluid host,
         IConstantFlowAgreementV1 cfa,
-        ISuperToken superToken
+        ISuperToken superToken,
+        ILendingPoolAddressesProvider aaveLendingPoolProvider
     ) 
     {
         require(address(host) != address(0), "Auction: host is empty");
         require(address(cfa) != address(0), "Auction: cfa is empty");
         require(address(superToken) != address(0), "Auction: superToken is empty");
+        require(address(aaveLendingPoolProvider) != address(0), "Auction: aaveLendingPoolProvider is empty");
         _host = host;
         _cfa = cfa;
         _superToken = superToken;
+        _aaveLendingPoolProvider = aaveLendingPoolProvider;
 
         uint256 configWord =
             SuperAppDefinitions.APP_LEVEL_FINAL |
@@ -81,7 +97,7 @@ contract FlowRoller is SuperAppBase {
         console.log("updatedFlowRate");
         console.logInt(flowRate);
 
-        getBalance(from);
+        // _getBalance(from);
 
         savers[from].timestamp = timestamp;
         savers[from].flowRate = flowRate;
@@ -101,9 +117,6 @@ contract FlowRoller is SuperAppBase {
 
         (address from,) = abi.decode(agreementData, (address, address));
 
-        uint256 prevTimestamp = savers[from].timestamp;
-        int96 prevFlowRate = savers[from].flowRate;
-
         (uint256 updatedTimestamp, int96 updatedFlowRate,,) = _cfa.getFlowByID(_superToken, agreementId);
 
         if (updatedFlowRate == 0) {
@@ -120,12 +133,10 @@ contract FlowRoller is SuperAppBase {
         console.log("updatedFlowRate");
         console.logInt(updatedFlowRate);
 
-        uint256 timeDelta = updatedTimestamp.sub(prevTimestamp);
-        uint256 newAccumulatedBalance = savers[from].prevAccumulatedBalance.add(timeDelta.mul(uint256(prevFlowRate)));
+        uint256 newAccumulatedBalance = _getBalance(from, updatedTimestamp);
+
         console.log("prevAccumulatedBalance");
         console.logUint(newAccumulatedBalance);
-
-        getBalance(from);
 
         // Update balance
         savers[from].prevAccumulatedBalance = newAccumulatedBalance;
@@ -133,22 +144,102 @@ contract FlowRoller is SuperAppBase {
         // Update other properties
         savers[from].timestamp = updatedTimestamp;
         savers[from].flowRate = updatedFlowRate;
-    
     }
 
-    function getBalance(
-        address from) 
-        private
-        returns(uint256 balance) 
+    function _depositBalance() 
+        public 
     {
-        // (int256 balance,,) = _cfa.realtimeBalanceOf(_superToken, from, block.timestamp);
-        // (int256 balance,,,) = ISuperToken(_superToken).realtimeBalanceOfNow(from);
-        balance = ISuperToken(_superToken).balanceOf(address(this));
-        console.log("real time balance");
-        console.logUint(balance);
+        // Check point timestamp
+        // IF amount > -1
+            // Check if balance is sufficient
+            // Update Saver object (balance = currBalance - amount, updatedTime = now)
+            // Downgrade amount
+            // Deposit into AAVE
+        // IF amount == -1
+            // Update Saver object (balance = 0, updatedTime = now)
+            // Downgrade amount
+            // Deposit into AAVE
 
-        return balance;
+        uint256 checkpoint = block.timestamp;
+        console.log("msg.sender: ");
+        console.log(msg.sender);
+        uint256 balanceAtCheckpoint = _getBalance(msg.sender, checkpoint);
+        console.log("balanceAtCheckpoint: ");
+        console.logUint(balanceAtCheckpoint);
+
+        uint256 amountToDeposit = balanceAtCheckpoint;
+
+        int amount = -1;
+        console.log("amount: ");
+        console.logInt(amount);
+
+        ILendingPoolAddressesProvider provider = ILendingPoolAddressesProvider(_aaveLendingPoolProvider);
+        ILendingPool lendingPool = ILendingPool(provider.getLendingPool());
+
+        // if (amount > -1) {
+        //     savers[msg.sender].timestamp = checkpoint;
+        //     savers[msg.sender].prevAccumulatedBalance = balanceAtCheckpoint.sub(uint256(amount));
+        //     amountToDeposit = uint256(amount);
+        // }
+        // else {
+        //     savers[msg.sender].timestamp = checkpoint;
+        //     savers[msg.sender].prevAccumulatedBalance = 0;
+        // }
+
+        console.log("_superToken symbol: " );
+        console.log(ISuperToken(_superToken).name());
+
+        address underlyingToken = ISuperToken(_superToken).getUnderlyingToken();
+
+        console.log("underlyingToken: ");
+        console.logAddress(underlyingToken);
+
+        ISuperToken(_superToken).downgrade(amountToDeposit);
+
+        console.log("amountToDeposit: ");
+        console.logUint(amountToDeposit);
+
+        uint256 underlyingTokenBalance = IERC20(underlyingToken).balanceOf(address(this));
+
+        console.log("underlyingToken balance: ");
+        console.logUint(underlyingTokenBalance);
+
+        IERC20(underlyingToken).approve(provider.getLendingPool(), amountToDeposit);
+
+        lendingPool.deposit(underlyingToken, amountToDeposit, msg.sender, 0);
+
+        savers[msg.sender].timestamp = checkpoint;
+        savers[msg.sender].prevAccumulatedBalance = 0;
     }
+
+    function _getBalance(
+        address from,
+        uint256 timestamp)
+        private
+        view
+        returns(uint256 balance)
+    {     
+        int96 prevFlowRate = savers[from].flowRate;
+        uint256 prevTimestamp = savers[from].timestamp;
+        uint256 timeDelta = timestamp.sub(prevTimestamp);
+        uint256 newAccumulatedBalance = savers[from].prevAccumulatedBalance.add(timeDelta.mul(uint256(prevFlowRate)));
+
+        return newAccumulatedBalance;
+    }
+
+    // function _getBalance(
+    //     address from) 
+    //     private
+    //     returns(uint256 balance) 
+    // {
+    //     // (int256 balance,,) = _cfa.realtimeBalanceOf(_superToken, from, block.timestamp);
+    //     // (int256 balance,,,) = ISuperToken(_superToken).realtimeBalanceOfNow(from);
+    //     balance = ISuperToken(_superToken).balanceOf(address(this));
+    //     console.log("real time balance");
+    //     console.logUint(balance);
+
+    //     return balance;
+    // }
 
 
     /**************************************************************************

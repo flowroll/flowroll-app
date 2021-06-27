@@ -9,15 +9,22 @@ const GOERLI_CFA = "0xEd6BcbF6907D4feEEe8a8875543249bEa9D308E8";
 const GOERLI_DAIX = "0xF2d68898557cCb2Cf4C10c3Ef2B034b2a69DAD00";
 const GOERLI_ETHX = "0x5943F705aBb6834Cad767e6E4bB258Bc48D9C947";
 
+const KOVAN_HOST = "0xF0d7d1D47109bA426B9D8A3Cde1941327af1eea3";
+const KOVAN_CFA = "0xECa8056809e7e8db04A8fF6e4E82cD889a46FE2F";
+const KOVAN_DAIX = "0xe3cb950cb164a31c66e32c320a800d477019dcff";
+const KOVAN_ETHX = "0xdd5462a7db7856c9128bc77bd65c2919ee23c6e1";
+const KOVAN_AAVE_ADDR_PROVIDER = "0x88757f2f99175387ab4c6a4b3067c77a695b0349";
+
 async function main() {
 
   // We get the contract to deploy
   const FlowRoller = await hre.ethers.getContractFactory("FlowRoller");
 
   const flowRoller = await FlowRoller.deploy(
-    GOERLI_HOST,
-    GOERLI_CFA,
-    GOERLI_ETHX
+    KOVAN_HOST,
+    KOVAN_CFA,
+    KOVAN_ETHX,
+    KOVAN_AAVE_ADDR_PROVIDER
     );
 
   // console.log(JSON.stringify(flowRoller));

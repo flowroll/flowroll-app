@@ -9,6 +9,7 @@
     "hardhat": "^2.4.1"
   },
   "dependencies": {
+    "@aave/protocol-v2": "^1.0.1",
     "@alch/alchemy-web3": "^1.1.1",
     "@superfluid-finance/ethereum-contracts": "^1.0.0-rc.4",
     "@superfluid-finance/js-sdk": "^0.4.3"
