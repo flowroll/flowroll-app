@@ -32,7 +32,7 @@ module.exports = {
     hardhat: {
       forking: {
         url: "https://eth-kovan.alchemyapi.io/v2/45x-QiW-4TZFuvdAP7xlmn2hOTFG1JTh",
-        blockNumber: 25749865
+        blockNumber: 25774528
       }
     }
   }
