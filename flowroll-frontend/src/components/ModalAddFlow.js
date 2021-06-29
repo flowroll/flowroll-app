@@ -1,6 +1,7 @@
 import { Component } from 'react';
 import { Modal, Button, Form } from 'react-bootstrap';
 
+import FLOW_RATE_CONSTANTS from '../flowRateConstants';
 
 class ModalAddFlow extends Component {
 
@@ -28,7 +29,7 @@ class ModalAddFlow extends Component {
 
     //make contract call here
     try {
-      const flowRateWeiPerDay = this.state.flowRate*18/(60*60*24) 
+      const flowRateWeiPerDay = Math.round(Number(this.state.flowRate)*FLOW_RATE_CONSTANTS.day) 
       await this.props.currUser.flow({
         recipient: '0x3905A1CfAe9d84fC25DffEF042f10f07Be9A7d06',
         flowRate: flowRateWeiPerDay.toString()
@@ -72,7 +73,7 @@ class ModalAddFlow extends Component {
 
           <Form.Group controlId="formFlowRate">
             <Form.Label>Flow Rate (per day)</Form.Label>
-            <Form.Control placeholder="0.05" name="flowRate" type="number" onChange={(e)=> this.handleFormChange(e)}/>
+            <Form.Control placeholder="0.05" name="flowRate" type="number" step="0.0001" onChange={(e)=> this.handleFormChange(e)}/>
           </Form.Group>
 
           <Button variant="primary" type="submit">

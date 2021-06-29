@@ -2,16 +2,16 @@ import { CircularProgressbar, buildStyles } from 'react-circular-progressbar';
 import 'react-circular-progressbar/dist/styles.css';
 import './Summary.scss';
 
-function Summary() {
+function Summary(props) {
   return (
     <div className="summary-wrapper">
       <div className="inflow-wrapper">
-        <h3>Inflow(DAI/s)</h3>
-        <p>0.13</p>
+        <h3>Inflow(DAI/day)</h3>
+        <p>{props.totalInFlow.toFixed(3)}</p>
       </div>
       <div style={{ width: 100, height: 100 }}>
-        <CircularProgressbar value={66}
-        text={'20DAI'}
+        <CircularProgressbar value={props.totalInFlow/(props.totalInFlow + props.totalOutFlow)}
+        text={props.balance}
         styles={buildStyles({
           rotation: 0.5,
           strokeLinecap: 'butt',
@@ -22,8 +22,8 @@ function Summary() {
         })} />
       </div>
       <div className="outflow-wrapper">
-        <h3>Outflow(DAI/s)</h3>
-        <p>0.03</p>
+        <h3>Outflow(DAI/day)</h3>
+        <p>{props.totalOutFlow.toFixed(3)}</p>
       </div>
     </div>
   );
