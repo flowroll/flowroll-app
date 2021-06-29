@@ -9,7 +9,7 @@ class ModalAddFlow extends Component {
     this.state = {
       flowName: '',
       dstAddress: '',
-      flowEndDate: null,
+      flowRate: null
     }
 
     this.handleSubmit = this.handleSubmit.bind(this);
@@ -22,15 +22,16 @@ class ModalAddFlow extends Component {
     const formData = {
       flowName: this.state.flowName,
       dstAddress: this.state.dstAddress,
-      flowEndDate: this.state.flowEndDate
+      flowRate: this.state.flowRate
     }
     console.log(formData)
 
     //make contract call here
     try {
+      const flowRateWeiPerDay = this.state.flowRate*18/(60*60*24) 
       await this.props.currUser.flow({
         recipient: '0x3905A1CfAe9d84fC25DffEF042f10f07Be9A7d06',
-        flowRate: '0'
+        flowRate: flowRateWeiPerDay.toString()
       });
 
     //if successful close
@@ -69,12 +70,12 @@ class ModalAddFlow extends Component {
             <Form.Control placeholder="0x3905A1CfAe9d84fC25DffEF042f10f07Be9A7d06" name="dstAddress" onChange={(e)=> this.handleFormChange(e)}/>
           </Form.Group>
 
-          <Form.Group controlId="formFlowEndDate">
-            <Form.Label>Terminate Flow Date</Form.Label>
-            <Form.Check type="date" name="flowEndDate" onChange={(e)=> this.handleFormChange(e)}/>
+          <Form.Group controlId="formFlowRate">
+            <Form.Label>Flow Rate (per day)</Form.Label>
+            <Form.Control placeholder="0.05" name="flowRate" type="number" onChange={(e)=> this.handleFormChange(e)}/>
           </Form.Group>
 
-            <Button variant="primary" type="submit">
+          <Button variant="primary" type="submit">
               Create
           </Button>
         </Form>
