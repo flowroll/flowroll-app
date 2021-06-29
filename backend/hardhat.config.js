@@ -1,5 +1,6 @@
 require("@nomiclabs/hardhat-waffle");
 // require("@nomiclabs/hardhat-truffle5");
+const ALCHEMY_ENDPOINTS = require("./alchemyApiEndpoints.json");
 
 // This is a sample Hardhat task. To learn how to create your own go to
 // https://hardhat.org/guides/create-task.html
@@ -31,8 +32,8 @@ module.exports = {
   networks: {
     hardhat: {
       forking: {
-        url: "https://eth-kovan.alchemyapi.io/v2/45x-QiW-4TZFuvdAP7xlmn2hOTFG1JTh",
-        blockNumber: 25774528
+        url: ALCHEMY_ENDPOINTS.kovan,
+        blockNumber: 25774880
       }
     }
   }
