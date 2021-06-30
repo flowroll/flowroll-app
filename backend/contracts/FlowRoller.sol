@@ -27,10 +27,15 @@ import {
 } from "../interfaces/ILendingPoolAddressesProvider.sol";
 
 import {
-    IERC20
-} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+    IUniswapV2Router02
+} from "../interfaces/IUniswapV2Router02.sol";
+import {
+    ERC20
+} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 import { SafeMath } from "@openzeppelin/contracts/math/SafeMath.sol";
+
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 
 import "hardhat/console.sol";
 
@@ -44,29 +49,38 @@ contract FlowRoller is SuperAppBase {
     }
 
     using SafeMath for uint256;
+    using SafeERC20 for ERC20;
 
     mapping(address => Saver) public savers;
 
     ISuperfluid private _host; // host
     IConstantFlowAgreementV1 public immutable _cfa;
     ISuperToken public immutable _superToken;
+    ERC20 public immutable _outputToken;
     ILendingPoolAddressesProvider private _aaveLendingPoolProvider;
+    IUniswapV2Router02 public immutable _uniswapRouter;
 
     constructor(
         ISuperfluid host,
         IConstantFlowAgreementV1 cfa,
         ISuperToken superToken,
-        ILendingPoolAddressesProvider aaveLendingPoolProvider
+        ERC20 outputToken,
+        ILendingPoolAddressesProvider aaveLendingPoolProvider,
+        IUniswapV2Router02 uniswapRouter
     ) 
     {
         require(address(host) != address(0), "Auction: host is empty");
         require(address(cfa) != address(0), "Auction: cfa is empty");
         require(address(superToken) != address(0), "Auction: superToken is empty");
         require(address(aaveLendingPoolProvider) != address(0), "Auction: aaveLendingPoolProvider is empty");
+        require(address(uniswapRouter) != address(0), "Auction: uniswapRouter is empty");
+
         _host = host;
         _cfa = cfa;
         _superToken = superToken;
         _aaveLendingPoolProvider = aaveLendingPoolProvider;
+        _uniswapRouter = uniswapRouter;
+        _outputToken = outputToken;
 
         uint256 configWord =
             SuperAppDefinitions.APP_LEVEL_FINAL |
@@ -149,17 +163,6 @@ contract FlowRoller is SuperAppBase {
     function _depositBalance() 
         public 
     {
-        // Check point timestamp
-        // IF amount > -1
-            // Check if balance is sufficient
-            // Update Saver object (balance = currBalance - amount, updatedTime = now)
-            // Downgrade amount
-            // Deposit into AAVE
-        // IF amount == -1
-            // Update Saver object (balance = 0, updatedTime = now)
-            // Downgrade amount
-            // Deposit into AAVE
-
         uint256 checkpoint = block.timestamp;
         console.log("msg.sender: ");
         console.log(msg.sender);
@@ -199,14 +202,33 @@ contract FlowRoller is SuperAppBase {
         console.log("amountToDeposit: ");
         console.logUint(amountToDeposit);
 
-        uint256 underlyingTokenBalance = IERC20(underlyingToken).balanceOf(address(this));
+        uint256 underlyingTokenBalance = ERC20(underlyingToken).balanceOf(address(this));
 
         console.log("underlyingToken balance: ");
         console.logUint(underlyingTokenBalance);
 
-        IERC20(underlyingToken).approve(provider.getLendingPool(), amountToDeposit);
+        ERC20(underlyingToken).approve(provider.getLendingPool(), amountToDeposit);
 
-        lendingPool.deposit(underlyingToken, amountToDeposit, msg.sender, 0);
+        uint256 minTradeAmount = amountToDeposit.sub(amountToDeposit.div(2000));
+        uint256 deadline = block.timestamp.add(60*20); // 20 minutes
+
+        uint swapOutputAmount = _swap(
+            ERC20(underlyingToken),
+            address(_outputToken),
+            address(this),
+            amountToDeposit,
+            minTradeAmount,
+            deadline
+        );
+
+        console.log("swapOutputAmount");
+        console.logUint(swapOutputAmount);
+
+        uint256 outputTokenBalance = _outputToken.balanceOf(address(this));
+        console.log("outputTokenBalance");
+        console.logUint(outputTokenBalance);
+
+        lendingPool.deposit(address(_outputToken), swapOutputAmount, msg.sender, 0);
 
         savers[msg.sender].timestamp = checkpoint;
         savers[msg.sender].prevAccumulatedBalance = 0;
@@ -227,19 +249,35 @@ contract FlowRoller is SuperAppBase {
         return newAccumulatedBalance;
     }
 
-    // function _getBalance(
-    //     address from) 
-    //     private
-    //     returns(uint256 balance) 
-    // {
-    //     // (int256 balance,,) = _cfa.realtimeBalanceOf(_superToken, from, block.timestamp);
-    //     // (int256 balance,,,) = ISuperToken(_superToken).realtimeBalanceOfNow(from);
-    //     balance = ISuperToken(_superToken).balanceOf(address(this));
-    //     console.log("real time balance");
-    //     console.logUint(balance);
+    function _swap(
+        ERC20 inputToken,
+        address outputToken,
+        address to,
+        uint256 amount,
+        uint256 minOutput,
+        uint256 deadline
+    ) internal returns(uint) {        
+        address[] memory path = new address[](2);
+        path[0] = address(inputToken);
+        path[1] = outputToken;
 
-    //     return balance;
-    // }
+        // approve the router to spend
+        inputToken.safeIncreaseAllowance(address(_uniswapRouter), amount);
+
+        console.log("allowance");
+        uint allowance = inputToken.allowance(address(this), address(_uniswapRouter));
+        console.logUint(allowance);
+
+        uint[] memory amounts = IUniswapV2Router02(_uniswapRouter).swapExactTokensForTokens(
+            amount,
+            minOutput,
+            path,
+            to,
+            deadline
+        );
+
+        return amounts[1];
+    }
 
 
     /**************************************************************************
