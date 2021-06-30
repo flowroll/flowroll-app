@@ -2,6 +2,7 @@ import logo from './logo.svg';
 import './App.css';
 import React, { Component } from 'react';
 import * as wethAbi from './contracts/IWETH.json';
+import * as daiAbi from './contracts/DAI.json';
 import * as FlowRoller from './contracts/FlowRoller.json';
 import * as uniswapAbi from './contracts/Uniswap.json';
 import { ChainId, Token, WETH, Fetcher, Trade, Route, TokenAmount, TradeType, Percent } from '@uniswap/sdk'
@@ -26,15 +27,20 @@ class App extends Component {
       web3: 'undefined',
       currUser: null,
       seth: null,
+      daix: null,
+      dai: null,
       ethBalance: 0,
       ethxBalance: 0,
+      daixBalance: 0,
+      daiBalance: 0,
       flowRoller: null,
       flowRollerAddress: null,
       uniswap: null,
+      sf: null,
      };
   }
 
-  async componentWillMount() {
+  async componentDidMount() {
     await this.createConstantCashFlow();
   }
 
@@ -50,26 +56,32 @@ class App extends Component {
 
       const sf = new SuperfluidSDK.Framework({
         web3: new Web3(window.ethereum),
-        resolverAddress: SUPERFLUID_RESOLVER_KOVAN_ADDRESS
+        resolverAddress: SUPERFLUID_RESOLVER_KOVAN_ADDRESS,
+        tokens: ["fDAI"],
       });
 
       await sf.initialize();
 
       if (accounts[0] != undefined) {
         let seth = new web3.eth.Contract(wethAbi['default'], ETHX_KOVAN_ADDRESS);
+        let dai = new web3.eth.Contract(daiAbi['default'], DAI_KOVAN_ADDRESS);
         let uniswap = new web3.eth.Contract(uniswapAbi['default'], UNISWAP_KOVAN_ADDRESS);
         let account = accounts[0];
 
         let ethBalance = await web3.eth.getBalance(account);
         
         // let ethxBalance = await seth.methods.balanceOf(account).call();
-        
+        let fDaixAddress = await sf.tokens.fDAIx.address;
         let currUser = sf.user({
           address: account,
-          token: ETHX_KOVAN_ADDRESS // ETHx Goerli Network Token
+          token: fDaixAddress // ETHx Goerli Network Token
         });
 
-        this.setState({ account, web3, currUser, ethBalance: web3.utils.fromWei(ethBalance, 'ether'), seth, uniswap});
+        const daix = await sf.contracts.ISuperToken.at(sf.tokens.fDAIx.address);
+        let daixBalance = await daix.balanceOf(account);
+        let daiBalance = await dai.methods.balanceOf(account).call();
+
+        this.setState({ sf, account, web3, currUser, ethBalance: web3.utils.fromWei(ethBalance, 'ether'), seth, uniswap, daix, daiBalance: web3.utils.fromWei(daiBalance, 'ether'), daixBalance: web3.utils.fromWei(daixBalance, 'ether')});
 
         await this.printDetails(currUser);
 
@@ -105,19 +117,23 @@ class App extends Component {
     console.log(value);
 
     await this.state.uniswap.methods.swapExactETHForTokens(
-      amountOutMin,
+      amount.toString(),
       path,
       to,
-      deadline).send( { value, gasPrice: 20e9 }); 
+      deadline).send( { value: value.toString(), from: this.state.account }); 
   }
 
   async streamEthxToAddress(amount) {
     if (this.state.currUser) {
       try {
-          await this.state.currUser.flow({
+        let flowObj = {
           recipient: this.state.flowRollerAddress,
           flowRate: amount
-        });
+        };
+
+        console.log(`flowObj: ${JSON.stringify(flowObj)}`);
+
+        await this.state.currUser.flow(flowObj);
         
         await this.printDetails(this.state.currUser);
       }
@@ -145,7 +161,37 @@ class App extends Component {
     }
   }
 
+  async getDaix(amount) {
+    const daix = await sf.contracts.ISuperToken.at(sf.tokens.fDAIx.address);
+    const daiAddress = await this.state.sf.resolver.get("tokens.fDAI");
+    const dai = await this.state.sf.contracts.TestToken.at(daiAddress);
+    console.log('DAIx ', this.state.daix.address);;
+    console.log('Minting and upgrading...');
+    await dai.mint(this.state.account, amount.toString(), { from: this.state.account });
+    await dai.approve(this.state.daix.address, amount.toString(), { from: this.state.account });
+    // await dai.methods.approve(this.state.daix.address, amount.toString()).send({ from: this.state.account });
+    await this.state.daix.upgrade(amount.toString(), { from: this.state.account });
+    console.log('Done minting and upgrading.');
+    let daixBalance = await this.state.daix.balanceOf(this.state.account);
+    console.log('Your DAIx balance', daixBalance.toString());
+    this.setState({ daixBalance });
+  }
+
   async upgradeEth(amount) {
+    if (this.state.seth) {
+      try {
+        await this.state.seth.methods.upgradeByETH().send({
+          from: this.state.account,
+          value: amount.toString(),
+        })
+      }
+      catch (e) {
+        console.log('Error upgradeEth: ', e);
+      }
+    }
+  }
+
+  async upgradeDai(amount) {
     if (this.state.seth) {
       try {
         await this.state.seth.methods.upgradeByETH().send({
@@ -173,6 +219,8 @@ class App extends Component {
           <h1>Charlie's SuperFluid App</h1>
           <h2>Connected address: {this.state.account}</h2>
           <h2>ETH Balance: {this.state.ethBalance}</h2>
+          <h2>DAIx Balance: {this.state.daixBalance}</h2>
+          <h2>DAI Balance: {this.state.daiBalance}</h2>
           <br></br>
           <div className="row">
             <main role="main" className="col-lg-12 d-flex text-center">
@@ -197,6 +245,31 @@ class App extends Component {
                         placeholder='amount...'
                         required
                         ref={(input) => { this.upgradeAmount = input }}
+                      />
+                      </div>
+                      <button type='submit' className='btn btn-primary'>Upgrade</button>
+                    </form>
+                  </div>
+                  <div>
+                    <br></br>
+                    Get DAIx
+                    <br></br>
+                    <form onSubmit={(e) => {
+                      e.preventDefault();
+                      let amount = this.getAmount.value;
+                      amount = amount * 10**18;
+                      this.getDaix(amount);
+                    }}>
+                      <div className='form-group mr-sm-2'>
+                      <br></br>
+                       <input
+                        id='getAmount'
+                        step='0.01'
+                        type='number'
+                        className='form-control form-control-md'
+                        placeholder='amount...'
+                        required
+                        ref={(input) => { this.getAmount = input }}
                       />
                       </div>
                       <button type='submit' className='btn btn-primary'>Upgrade</button>
@@ -281,28 +354,29 @@ class App extends Component {
                   </div>
                   <div>
                     <br></br>
-                    Swap ETH For DAI
+                    Swap ETH for DAI
                     <br></br>
                     <form onSubmit={(e) => {
                       e.preventDefault();
-                      let sendAmount = this.sendAmount.value;
-                      sendAmount = sendAmount * 10**18;
-                      this.swapETHForDAI(sendAmount);
+                      let swapAmount = this.swapAmount.value;
+                      swapAmount = swapAmount * 10**18;
+                      
+                      this.swapETHForDAI(swapAmount);
                     }}>
                       <div className='form-group mr-sm-2'>
                       <br></br>
                       <br></br>
                        <input
-                        id='sendAmount'
+                        id='swapAmount'
                         step='0.01'
                         type='number'
                         className='form-control form-control-md'
                         placeholder='swap amount...'
                         required
-                        ref={(input) => { this.sendAmount = input }}
+                        ref={(input) => { this.swapAmount = input }}
                       />
                       </div>
-                      <button type='submit' className='btn btn-primary'>Stream</button>
+                      <button type='submit' className='btn btn-primary'>Swap</button>
                     </form>
                   </div>
               </div>
