@@ -8,6 +8,7 @@ import Main from './components/Main';
 import Summary from './components/Summary';
 
 import NETWORK_ADDRESSES from './networkAddresses.json';
+import FLOW_RATE_CONSTANTS from './flowRateConstants';
 
 class App extends Component {
   constructor(props){
@@ -16,6 +17,11 @@ class App extends Component {
       account: null,
       web3: null,
       currUser: null,
+      inFlows: [],
+      totalInFlow: 0,
+      outFlows: [],
+      totalOutFlow: 0,
+      balance: 0
     };
 
     this.connect = this.connect.bind(this);
@@ -34,9 +40,15 @@ class App extends Component {
       const sf = new SuperfluidSDK.Framework({
         web3: new Web3(window.ethereum),
       });
-      await sf.initialize();
 
-      if (accounts[0] != undefined) {
+      try {
+        await sf.initialize();
+      } catch(err){
+        console.error('SF failed to initialize')
+        console.error(err);
+      }
+
+      if (accounts[0] !== undefined) {
         let account = accounts[0];
         
         let currUser = sf.user({
@@ -44,11 +56,44 @@ class App extends Component {
           token: NETWORK_ADDRESSES.kovan // ETHx Kovan Network Token
         });
 
-        this.setState({ account, web3, currUser});
+        const balanceWei = await web3.eth.getBalance(accounts[0]);
+        console.log("balanceWei:", balanceWei)
+        const balance = web3.utils.fromWei(balanceWei)
+        console.log('balance:', balance)
+
+        this.setState({ account, web3, currUser, balance});
 
         let details = await currUser.details();
 
         console.log(`details: ${JSON.stringify(details)}`);
+
+        if(details && details.cfa && details.cfa.flows){
+
+          let totalInFlow = 0;
+          const inFlows = details.cfa.flows.inFlows.map( flow => {
+              const flowRate = Number(flow.flowRate)/FLOW_RATE_CONSTANTS.day;
+              totalInFlow = totalInFlow + flowRate;
+              return({
+                receiver: flow.receiver,
+                flowRate
+              })
+            }
+          )
+
+          let totalOutFlow = 0;
+          const outFlows = details.cfa.flows.outFlows.map( flow => {
+            const flowRate = Number(flow.flowRate)/FLOW_RATE_CONSTANTS.day;
+            totalOutFlow = totalOutFlow + flowRate;
+              return({
+                receiver: flow.receiver,
+                flowRate
+              })
+          })
+
+          this.setState({
+            inFlows, totalInFlow, outFlows, totalOutFlow
+          })
+        }
 
       }
       else {
@@ -65,8 +110,8 @@ class App extends Component {
    return (
       <div className="App">
         <Header account={this.state.account} connect={() => this.connect()}></Header>
-        <Summary></Summary>
-        <Main currUser={this.state.currUser}></Main>
+        <Summary balance={this.state.balance} totalInFlow={this.state.totalInFlow} totalOutFlow={this.state.totalOutFlow}></Summary>
+        {this.state.currUser && <Main currUser={this.state.currUser}></Main> }
       </div>
     );
   }
