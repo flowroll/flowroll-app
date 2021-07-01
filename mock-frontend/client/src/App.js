@@ -161,8 +161,17 @@ class App extends Component {
     }
   }
 
+  withdrawFromAAVE(amount) {
+    if (this.state.flowRoller) {
+      console.log(`withdrawing from AAVE...`);
+
+      this.state.flowRoller.methods._withdraw().send({
+        from: this.state.account,
+      });
+    }
+  }
+
   async getDaix(amount) {
-    const daix = await sf.contracts.ISuperToken.at(sf.tokens.fDAIx.address);
     const daiAddress = await this.state.sf.resolver.get("tokens.fDAI");
     const dai = await this.state.sf.contracts.TestToken.at(daiAddress);
     console.log('DAIx ', this.state.daix.address);;
@@ -172,9 +181,9 @@ class App extends Component {
     // await dai.methods.approve(this.state.daix.address, amount.toString()).send({ from: this.state.account });
     await this.state.daix.upgrade(amount.toString(), { from: this.state.account });
     console.log('Done minting and upgrading.');
-    let daixBalance = await this.state.daix.balanceOf(this.state.account);
-    console.log('Your DAIx balance', daixBalance.toString());
-    this.setState({ daixBalance });
+    // let daixBalance = await this.state.daix.balanceOf(this.state.account);
+    // console.log('Your DAIx balance', daixBalance.toString());
+    // this.setState({ daixBalance });
   }
 
   async upgradeEth(amount) {
@@ -257,7 +266,7 @@ class App extends Component {
                     <form onSubmit={(e) => {
                       e.preventDefault();
                       let amount = this.getAmount.value;
-                      amount = amount * 10**18;
+                      amount = this.state.web3.utils.toWei(amount,'ether');
                       this.getDaix(amount);
                     }}>
                       <div className='form-group mr-sm-2'>
@@ -347,6 +356,34 @@ class App extends Component {
                         placeholder='deposit amount...'
                         required
                         ref={(input) => { this.depositAmount = input }}
+                      />
+                      </div>
+                      <button type='submit' className='btn btn-primary'>Stream</button>
+                    </form>
+                  </div>
+                  <div>
+                    <br></br>
+                    Withdraw from AAVE
+                    <br></br>
+                    <form onSubmit={(e) => {
+                      e.preventDefault();
+                      let withdrawAmount = this.withdrawAmount.value;
+                      if (withdrawAmount > -1) {
+                        withdrawAmount = withdrawAmount * 10**18;
+                      }
+                      this.withdrawFromAAVE(withdrawAmount);
+                    }}>
+                      <div className='form-group mr-sm-2'>
+                      <br></br>
+                      <br></br>
+                       <input
+                        id='withdrawAmount'
+                        step='0.01'
+                        type='number'
+                        className='form-control form-control-md'
+                        placeholder='deposit amount...'
+                        required
+                        ref={(input) => { this.withdrawAmount = input }}
                       />
                       </div>
                       <button type='submit' className='btn btn-primary'>Stream</button>

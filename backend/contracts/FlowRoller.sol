@@ -27,8 +27,16 @@ import {
 } from "../interfaces/ILendingPoolAddressesProvider.sol";
 
 import {
+    IAaveProtocolDataProvider
+} from "../interfaces/IAaveProtocolDataProvider.sol";
+
+import
+{
     IUniswapV2Router02
-} from "../interfaces/IUniswapV2Router02.sol";
+} from "@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
+// import {
+//     IUniswapV2Router02
+// } from "../interfaces/IUniswapV2Router02.sol";
 import {
     ERC20
 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
@@ -59,6 +67,8 @@ contract FlowRoller is SuperAppBase {
     ERC20 public immutable _outputToken;
     ILendingPoolAddressesProvider private _aaveLendingPoolProvider;
     IUniswapV2Router02 public immutable _uniswapRouter;
+
+    // bytes32 internal constant _AAVE_DATA_PROVIDER_REFERENCE = 0x1;
 
     constructor(
         ISuperfluid host,
@@ -105,7 +115,10 @@ contract FlowRoller is SuperAppBase {
         
         console.logBytes32(agreementId);
         (address from,) = abi.decode(agreementData, (address, address));
-        (uint256 timestamp, int96 flowRate,,) = _cfa.getFlowByID(_superToken, agreementId);
+        (uint256 timestamp, int96 flowRate,,) = _cfa.getFlowByID(
+            _superToken, 
+            agreementId
+            );
         console.log("updatedTimestamp");
         console.logUint(timestamp);
         console.log("updatedFlowRate");
@@ -176,9 +189,6 @@ contract FlowRoller is SuperAppBase {
         console.log("amount: ");
         console.logInt(amount);
 
-        ILendingPoolAddressesProvider provider = ILendingPoolAddressesProvider(_aaveLendingPoolProvider);
-        ILendingPool lendingPool = ILendingPool(provider.getLendingPool());
-
         // if (amount > -1) {
         //     savers[msg.sender].timestamp = checkpoint;
         //     savers[msg.sender].prevAccumulatedBalance = balanceAtCheckpoint.sub(uint256(amount));
@@ -207,10 +217,14 @@ contract FlowRoller is SuperAppBase {
         console.log("underlyingToken balance: ");
         console.logUint(underlyingTokenBalance);
 
-        ERC20(underlyingToken).approve(provider.getLendingPool(), amountToDeposit);
+        // console.log("_outputToken: ");
+        // console.logAddress(ERC20(_outputToken).name());
 
-        uint256 minTradeAmount = amountToDeposit.sub(amountToDeposit.div(2000));
-        uint256 deadline = block.timestamp.add(60*20); // 20 minutes
+        uint256 minTradeAmount = amountToDeposit.sub(amountToDeposit.div(200));
+        uint256 deadline = block.timestamp.add(1200); // 20 minutes
+
+        console.log("minTradeAmount");
+        console.logUint(minTradeAmount);
 
         uint swapOutputAmount = _swap(
             ERC20(underlyingToken),
@@ -228,10 +242,35 @@ contract FlowRoller is SuperAppBase {
         console.log("outputTokenBalance");
         console.logUint(outputTokenBalance);
 
-        lendingPool.deposit(address(_outputToken), swapOutputAmount, msg.sender, 0);
+
+        ILendingPoolAddressesProvider provider = ILendingPoolAddressesProvider(_aaveLendingPoolProvider);
+        ILendingPool lendingPool = ILendingPool(provider.getLendingPool());
+
+        ERC20(_outputToken).approve(provider.getLendingPool(), swapOutputAmount);
+
+        lendingPool.deposit(
+            address(_outputToken), 
+            swapOutputAmount, 
+            msg.sender, 
+            0);
 
         savers[msg.sender].timestamp = checkpoint;
         savers[msg.sender].prevAccumulatedBalance = 0;
+    }
+
+    function _withdraw() 
+        public 
+        returns(uint256 withdrawn)
+    {
+        // check how much in AAVE
+        // IF > 0, withdraw all on behalf of msg.sender
+        ILendingPool lendingPool = ILendingPool(_aaveLendingPoolProvider.getLendingPool());
+        withdrawn = lendingPool.withdraw(address(_outputToken), type(uint).max, msg.sender);
+
+        console.log("withdrawn");
+        console.logUint(withdrawn);
+
+        return withdrawn;
     }
 
     function _getBalance(
@@ -256,7 +295,7 @@ contract FlowRoller is SuperAppBase {
         uint256 amount,
         uint256 minOutput,
         uint256 deadline
-    ) internal returns(uint) {        
+    ) private returns(uint) {        
         address[] memory path = new address[](2);
         path[0] = address(inputToken);
         path[1] = outputToken;
@@ -264,9 +303,24 @@ contract FlowRoller is SuperAppBase {
         // approve the router to spend
         inputToken.safeIncreaseAllowance(address(_uniswapRouter), amount);
 
-        console.log("allowance");
-        uint allowance = inputToken.allowance(address(this), address(_uniswapRouter));
-        console.logUint(allowance);
+        console.log("_uniswapRouter");
+        console.logAddress(address(_uniswapRouter));
+
+        console.log("amount");
+        console.logUint(amount);
+
+        console.log("path[0]");
+        console.logAddress(path[0]);
+
+        console.log("path[1]");
+        console.logAddress(path[1]);
+
+        console.log("block.timestamp");
+        console.logUint(block.timestamp);
+
+        console.log("deadline");
+        console.logUint(deadline);
+        // inputToken.safeApprove(address(_uniswapRouter), uint256(-1));
 
         uint[] memory amounts = IUniswapV2Router02(_uniswapRouter).swapExactTokensForTokens(
             amount,
