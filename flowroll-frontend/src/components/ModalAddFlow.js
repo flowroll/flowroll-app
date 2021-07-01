@@ -3,13 +3,15 @@ import { Modal, Button, Form } from 'react-bootstrap';
 
 import FLOW_RATE_CONSTANTS from '../flowRateConstants';
 
+const CONTRACT_ADDRESS = {
+  local: '0xe844dF90c946CecD08076D129E14a3bc04C9f5d5',
+  kovan: '0xD67d8A4765C08A3dB744b31a7C49868f2df6ecDe'
+}
 class ModalAddFlow extends Component {
 
   constructor(props){
     super(props)
     this.state = {
-      flowName: '',
-      dstAddress: '',
       flowRate: null
     }
 
@@ -21,8 +23,6 @@ class ModalAddFlow extends Component {
     event.preventDefault();
     
     const formData = {
-      flowName: this.state.flowName,
-      dstAddress: this.state.dstAddress,
       flowRate: this.state.flowRate
     }
     console.log(formData)
@@ -31,10 +31,11 @@ class ModalAddFlow extends Component {
     try {
       const flowRateWeiPerDay = Math.round(Number(this.state.flowRate)*FLOW_RATE_CONSTANTS.day) 
       await this.props.currUser.flow({
-        recipient: '0x3905A1CfAe9d84fC25DffEF042f10f07Be9A7d06',
+        recipient: CONTRACT_ADDRESS.kovan,
         flowRate: flowRateWeiPerDay.toString()
       });
 
+      this.props.updateFlows();
     //if successful close
     this.props.onHide();
     } catch(err){
@@ -61,19 +62,9 @@ class ModalAddFlow extends Component {
       <Modal.Body>
         <Form 
         onSubmit={this.handleSubmit}>
-          <Form.Group controlId="formFlowName">
-            <Form.Label>Flow name</Form.Label>
-            <Form.Control placeholder="Aave Savings Maximiser" name="flowName" onChange={(e)=> this.handleFormChange(e)}/>
-          </Form.Group>
-
-          <Form.Group controlId="formFlowDestAddress">
-            <Form.Label>Destination Address</Form.Label>
-            <Form.Control placeholder="0x3905A1CfAe9d84fC25DffEF042f10f07Be9A7d06" name="dstAddress" onChange={(e)=> this.handleFormChange(e)}/>
-          </Form.Group>
-
           <Form.Group controlId="formFlowRate">
             <Form.Label>Flow Rate (per day)</Form.Label>
-            <Form.Control placeholder="0.05" name="flowRate" type="number" step="0.0001" onChange={(e)=> this.handleFormChange(e)}/>
+            <Form.Control placeholder="0.05" name="flowRate" type="number" step="0.001" onChange={(e)=> this.handleFormChange(e)}/>
           </Form.Group>
 
           <Button variant="primary" type="submit">

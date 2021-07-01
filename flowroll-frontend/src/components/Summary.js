@@ -10,8 +10,8 @@ function Summary(props) {
         <p>{props.totalInFlow.toFixed(3)}</p>
       </div>
       <div style={{ width: 100, height: 100 }}>
-        <CircularProgressbar value={props.totalInFlow/(props.totalInFlow + props.totalOutFlow)}
-        text={props.balance}
+        <CircularProgressbar value={100*props.totalInFlow/(props.totalInFlow + props.totalOutFlow)}
+        text={Number(props.balance).toFixed(4)}
         styles={buildStyles({
           rotation: 0.5,
           strokeLinecap: 'butt',

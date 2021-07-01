@@ -32,8 +32,8 @@ module.exports = {
   networks: {
     hardhat: {
       forking: {
-        url: ALCHEMY_ENDPOINTS.kovan,
-        // blockNumber: 25774880
+        url: 'https://eth-kovan.alchemyapi.io/v2/-z0AAOT9viBOYZGwHW6fVtLbaqrLD5qy',
+        blockNumber: 25818177
       }
     }
   }

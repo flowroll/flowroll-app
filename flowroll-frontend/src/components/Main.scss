@@ -12,4 +12,18 @@
       color: purple;
     }
   }
+
+  .flow-card {
+    margin: 20px;
+    box-shadow: 5px 5px 3px #888888;
+
+    .inflow-rate {
+      color:#7EF0B3;
+
+    }
+    .outflow-rate {
+      color:#F07E7E;
+
+    }
+  }
 }
