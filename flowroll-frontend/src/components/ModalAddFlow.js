@@ -2,11 +2,8 @@ import { Component } from 'react';
 import { Modal, Button, Form } from 'react-bootstrap';
 
 import FLOW_RATE_CONSTANTS from '../flowRateConstants';
+import ADDRESSES from '../addresses.json';
 
-const CONTRACT_ADDRESS = {
-  local: '0xe844dF90c946CecD08076D129E14a3bc04C9f5d5',
-  kovan: '0xD67d8A4765C08A3dB744b31a7C49868f2df6ecDe'
-}
 class ModalAddFlow extends Component {
 
   constructor(props){
@@ -31,7 +28,7 @@ class ModalAddFlow extends Component {
     try {
       const flowRateWeiPerDay = Math.round(Number(this.state.flowRate)*FLOW_RATE_CONSTANTS.day) 
       await this.props.currUser.flow({
-        recipient: CONTRACT_ADDRESS.kovan,
+        recipient: ADDRESSES.contract.kovan,
         flowRate: flowRateWeiPerDay.toString()
       });
 

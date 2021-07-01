@@ -7,7 +7,9 @@ import Header from './components/Header';
 import Main from './components/Main';
 import Summary from './components/Summary';
 
-import NETWORK_ADDRESSES from './networkAddresses.json';
+import * as FlowRoller from './contracts/FlowRoller.json';
+
+import ADDRESSES from './addresses.json';
 import FLOW_RATE_CONSTANTS from './flowRateConstants';
 
 class App extends Component {
@@ -21,9 +23,16 @@ class App extends Component {
       outFlows: [],
       totalOutFlow: 0,
       balance: 0,
+      flowRoller: null,
+      flowRollerAddress: null,
+      updateBalanceInterval: null
     };
 
     this.connect = this.connect.bind(this);
+  }
+
+  componentWillUnmount() {
+    clearInterval(this.state.updateBalanceInterval)
   }
 
   connect = async () => {
@@ -35,7 +44,7 @@ class App extends Component {
 
       const sf = new SuperfluidSDK.Framework({
         web3: new Web3(window.ethereum),
-        resolverAddress: NETWORK_ADDRESSES.superfluid_resolver_addr_kovan,
+        resolverAddress: ADDRESSES.networks.superfluid_resolver_addr_kovan,
         tokens: ['fDAI']
       });
 
@@ -57,11 +66,17 @@ class App extends Component {
 
         this.setState({ account, web3, currUser});
 
-        setInterval(() => {
+        const updateBalanceInterval = setInterval(() => {
           this.updateBalance(web3, sf);
         }, 5000)
         this.updateFlows();
         
+        let flowRoller = new this.state.web3.eth.Contract(FlowRoller['abi'], ADDRESSES.contract.kovan);
+
+        console.log(`flowRoller is set: ${flowRoller}`);
+    
+        this.setState({ updateBalanceInterval, flowRoller, flowRollerAddress: ADDRESSES.contract.kovan});
+
         // this.mintDaix(sf);
       }
       else {
@@ -132,13 +147,40 @@ class App extends Component {
     }
   }
 
+  depositToAAVE() {
+    if (this.state.flowRoller) {
+      console.log(`depositing to AAVE...${this.state.flowRollerAddress}`);
+
+      this.state.flowRoller.methods._depositBalance().send({
+        from: this.state.account,
+      });
+    }
+  }
+
+  withdrawFromAAVE() {
+    if (this.state.flowRoller) {
+      console.log(`withdrawing from AAVE...`);
+
+      this.state.flowRoller.methods._withdraw().send({
+        from: this.state.account,
+      });
+    }
+  }
   render() {
 
    return (
       <div className="App">
         <Header account={this.state.account} connect={() => this.connect()}></Header>
         <Summary balance={this.state.balance} totalInFlow={this.state.totalInFlow} totalOutFlow={this.state.totalOutFlow}></Summary>
-        {this.state.currUser && <Main currUser={this.state.currUser} inFlows={this.state.inFlows} outFlows={this.state.outFlows} updateFlows={() => this.updateFlows()}></Main> }
+        {this.state.currUser && 
+          <Main 
+          currUser={this.state.currUser} 
+          inFlows={this.state.inFlows} 
+          outFlows={this.state.outFlows} 
+          updateFlows={() => this.updateFlows()}
+          depositToAAVE={() => this.depositToAAVE()}
+          withdrawFromAAVE={() => this.withdrawFromAAVE()}
+          ></Main> }
       </div>
     );
   }

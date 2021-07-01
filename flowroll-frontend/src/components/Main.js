@@ -1,11 +1,14 @@
 import AddBoxIcon from '@material-ui/icons/AddBox';
 import Button from 'react-bootstrap/Button';
+import ButtonGroup from 'react-bootstrap/ButtonGroup';
 import Card from 'react-bootstrap/Card';
 
 import { useState } from 'react';
 
 import ModalAddFlow from './ModalAddFlow';
 import './Main.scss';
+
+import ADDRESSES from '../addresses.json';
 
 function Main(props) {
   const [modalOpen, setModalOpen] = useState(false);
@@ -44,6 +47,11 @@ function Main(props) {
         <Card.Text>
           Flow Rate: <span className="outflow-rate">{flow.flowRate.toFixed(3)}/day</span>
         </Card.Text>
+        {flow.receiver === ADDRESSES.contract.kovan && <ButtonGroup>
+            <Button className="mr-2" onClick={() => props.depositToAAVE()}>Deposit to AAVE</Button>
+            <Button onClick={() => props.withdrawFromAAVE()}>Withdraw from AAVE</Button>
+          </ButtonGroup>}
+        
       </Card.Body>
       </Card>
     ))
