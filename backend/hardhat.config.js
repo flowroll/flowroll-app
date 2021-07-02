@@ -1,7 +1,6 @@
 require("@nomiclabs/hardhat-waffle");
 // require("@nomiclabs/hardhat-truffle5");
-const ALCHEMY_ENDPOINTS = require("./alchemyApiEndpoints.json");
-
+const CONSTANTS = require("./constants.json");
 // This is a sample Hardhat task. To learn how to create your own go to
 // https://hardhat.org/guides/create-task.html
 task("accounts", "Prints the list of accounts", async () => {
@@ -32,9 +31,12 @@ module.exports = {
   networks: {
     hardhat: {
       forking: {
-        url: ALCHEMY_ENDPOINTS.kovan,
-        // blockNumber: 25774880
+        url: CONSTANTS.alchemy.kovan,
       }
+    },
+    kovan: {
+      url: CONSTANTS.alchemy.kovan,
+      accounts: [`0x${CONSTANTS.privateKey.kovan}`]
     }
   }
 };
