@@ -4,12 +4,27 @@
   margin: auto;
   h1.flows-title {
     display: inline-block;
+    margin-top: 20px;
   }
   .add-box-icon {
     cursor: pointer;
     margin-left: 10px;
     &:hover {
       color: purple;
+    }
+  }
+
+  .flow-card {
+    margin: 20px;
+    box-shadow: 5px 5px 3px #888888;
+
+    .inflow-rate {
+      color:#7EF0B3;
+
+    }
+    .outflow-rate {
+      color:#F07E7E;
+
     }
   }
 }

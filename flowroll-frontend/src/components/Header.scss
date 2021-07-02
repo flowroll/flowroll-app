@@ -7,7 +7,6 @@ $header-height: 50px;
   flex-direction: row;
   align-items: center;
   .logo-wrapper {
-    background-color: black;
     width: $header-height;
     height: $header-height;
     img {
@@ -19,16 +18,25 @@ $header-height: 50px;
     padding-left: 30px;
     padding-right: 40px;
     width: 100%;
-    display: flex;
-    justify-content: space-between;
+    // display: flex;
+    // justify-content: space-between;
     .tokens {
       text-decoration: underline;
       font-weight: bold;
     }
     .connect-wallet-btn {
-      height: $header-height - 10px;
+      float: right;
+      height: $header-height - 15px;
       margin: auto;
       margin-right: 0;
+      background-color: black;
+      color:#a485e7;
+      border-color: #a485e7 solid 2px;
+      &:hover {
+        background-color: #a485e7;
+        color:black;
+        border-color: black solid 2px;
+      }
     }
   }
 
