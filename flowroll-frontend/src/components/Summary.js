@@ -7,7 +7,7 @@ function Summary(props) {
     <div className="summary-wrapper">
       <div className="inflow-wrapper">
         <h3>Inflow(DAI/day)</h3>
-        <p>{props.totalInFlow.toFixed(3)}</p>
+        <p>{props.totalInFlow.toFixed(4)}</p>
       </div>
       <div style={{ width: 100, height: 100 }}>
         <CircularProgressbar value={100*props.totalInFlow/(props.totalInFlow + props.totalOutFlow)}
@@ -23,7 +23,7 @@ function Summary(props) {
       </div>
       <div className="outflow-wrapper">
         <h3>Outflow(DAI/day)</h3>
-        <p>{props.totalOutFlow.toFixed(3)}</p>
+        <p>{props.totalOutFlow.toFixed(4)}</p>
       </div>
     </div>
   );

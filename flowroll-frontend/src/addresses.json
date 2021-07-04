@@ -4,8 +4,11 @@
     "superfluid_resolver_addr_kovan": "0x851d3dd9dc97c1df1DA73467449B3893fc76D85B"
   },
   "contract": {
-    "local": "0xe844dF90c946CecD08076D129E14a3bc04C9f5d5",
-    "kovan": "0x9A856E419270ac7CC2ed21CBBCb9fA4fe65bAB54"
+    "local": "0xb9A62F59F8c1359E24830e4FD209954E21B7DF37",
+    "kovan": "0x5D1F5A6636f6C85c409d408E96f3A51357e96AEa"
+  },
+  "tokens": {
+    "aDai": "0xdCf0aF9e59C002FA3AA091a46196b37530FD48a8"
   }
 
 }

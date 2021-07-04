@@ -4,7 +4,7 @@ import { Modal, Button, Form } from 'react-bootstrap';
 import FLOW_RATE_CONSTANTS from '../flowRateConstants';
 import ADDRESSES from '../addresses.json';
 
-class ModalAddFlow extends Component {
+class ModalAddOrEditFlow extends Component {
 
   constructor(props){
     super(props)
@@ -28,11 +28,11 @@ class ModalAddFlow extends Component {
     try {
       const flowRateWeiPerDay = Math.round(Number(this.state.flowRate)*FLOW_RATE_CONSTANTS.day) 
       await this.props.currUser.flow({
-        recipient: ADDRESSES.contract.kovan,
+        recipient: this.props.flowRollerAddress,
         flowRate: flowRateWeiPerDay.toString()
       });
 
-      this.props.updateFlows();
+      this.props.updateFlows(this.props.sf);
     //if successful close
     this.props.onHide();
     } catch(err){
@@ -46,6 +46,22 @@ class ModalAddFlow extends Component {
   }
 
   render(){
+    let hasSavingsFlow = this.props.outFlows.some(outFlow => outFlow.isSavings);
+    let heading;
+    let button;
+    let label;
+
+    if (hasSavingsFlow) {
+      heading = "Update Savings Flow"
+      button = "Update"
+      label = "DAI/day (input 0 if you'd like to cancel) "
+    }
+    else {
+      heading = "Create Savings Flow"
+      button = "Create"
+      label = "DAI/day"
+    }
+
     return (
       <Modal
         show={this.props.show}
@@ -54,18 +70,18 @@ class ModalAddFlow extends Component {
         centered
       >
       <Modal.Header closeButton>
-        <Modal.Title id="contained-modal-title-vcenter">Create Flow</Modal.Title>
+        <Modal.Title id="contained-modal-title-vcenter">{heading}</Modal.Title>
       </Modal.Header>
       <Modal.Body>
         <Form 
         onSubmit={this.handleSubmit}>
           <Form.Group controlId="formFlowRate">
-            <Form.Label>Flow Rate (per day)</Form.Label>
+            <Form.Label>{label}</Form.Label>
             <Form.Control placeholder="0.05" name="flowRate" type="number" step="0.001" onChange={(e)=> this.handleFormChange(e)}/>
           </Form.Group>
 
           <Button variant="primary" type="submit">
-              Create
+              {button}
           </Button>
         </Form>
       </Modal.Body>
@@ -74,4 +90,4 @@ class ModalAddFlow extends Component {
   }
 }
 
-export default ModalAddFlow;
+export default ModalAddOrEditFlow;

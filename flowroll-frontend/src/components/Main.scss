@@ -9,6 +9,8 @@
   .add-box-icon {
     cursor: pointer;
     margin-left: 10px;
+    position: relative;
+    bottom: 8px;
     &:hover {
       color: purple;
     }
@@ -18,13 +20,30 @@
     margin: 20px;
     box-shadow: 5px 5px 3px #888888;
 
+    .card-title {
+      font-size: 24px;
+      font-weight: bold;
+      .address {
+        color:#707070;
+        font-size: 12px;
+      }
+    }
+
+    .card-text {
+      color:#707070;
+    }
+
+    .saving-amount {
+      font-weight: bold;
+    }
+
     .inflow-rate {
       color:#7EF0B3;
-
+      font-weight: bold;
     }
     .outflow-rate {
       color:#F07E7E;
-
+      font-weight: bold;
     }
   }
 }
