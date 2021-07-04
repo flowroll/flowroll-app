@@ -17,6 +17,7 @@ const ETHX_KOVAN_ADDRESS = '0xdd5462a7db7856c9128bc77bd65c2919ee23c6e1';
 const SUPERFLUID_RESOLVER_KOVAN_ADDRESS = '0x851d3dd9dc97c1df1DA73467449B3893fc76D85B';
 const DAI_KOVAN_ADDRESS = '0x4f96fe3b7a6cf9725f59d353f723c1bdb64ca6aa';
 const DAIX_KOVAN_ADDRESS = '0xe3cb950cb164a31c66e32c320a800d477019dcff';
+const aDAI_KOVAN_ADDRESS = '0xdCf0aF9e59C002FA3AA091a46196b37530FD48a8';
 
 class App extends Component {
 
@@ -29,6 +30,8 @@ class App extends Component {
       seth: null,
       daix: null,
       dai: null,
+      aDai: null,
+      aDaiBalance: 0,
       ethBalance: 0,
       ethxBalance: 0,
       daixBalance: 0,
@@ -65,6 +68,7 @@ class App extends Component {
       if (accounts[0] != undefined) {
         let seth = new web3.eth.Contract(wethAbi['default'], ETHX_KOVAN_ADDRESS);
         let dai = new web3.eth.Contract(daiAbi['default'], DAI_KOVAN_ADDRESS);
+        let aDai = new web3.eth.Contract(daiAbi['default'], aDAI_KOVAN_ADDRESS);
         let uniswap = new web3.eth.Contract(uniswapAbi['default'], UNISWAP_KOVAN_ADDRESS);
         let account = accounts[0];
 
@@ -80,8 +84,21 @@ class App extends Component {
         const daix = await sf.contracts.ISuperToken.at(sf.tokens.fDAIx.address);
         let daixBalance = await daix.balanceOf(account);
         let daiBalance = await dai.methods.balanceOf(account).call();
+        let aDaiBalance = await aDai.methods.balanceOf(account).call();
 
-        this.setState({ sf, account, web3, currUser, ethBalance: web3.utils.fromWei(ethBalance, 'ether'), seth, uniswap, daix, daiBalance: web3.utils.fromWei(daiBalance, 'ether'), daixBalance: web3.utils.fromWei(daixBalance, 'ether')});
+        this.setState({ 
+          sf, 
+          account, 
+          web3, 
+          currUser, 
+          ethBalance: web3.utils.fromWei(ethBalance, 'ether'), 
+          seth, 
+          uniswap, 
+          daix, 
+          aDai,
+          aDaiBalance: web3.utils.fromWei(aDaiBalance, 'ether'), 
+          daiBalance: web3.utils.fromWei(daiBalance, 'ether'), 
+          daixBalance: web3.utils.fromWei(daixBalance, 'ether')});
 
         await this.printDetails(currUser);
 
@@ -123,11 +140,11 @@ class App extends Component {
       deadline).send( { value: value.toString(), from: this.state.account }); 
   }
 
-  async streamEthxToAddress(amount) {
+  async streamEthxToAddress(amount, addressTo) {
     if (this.state.currUser) {
       try {
         let flowObj = {
-          recipient: this.state.flowRollerAddress,
+          recipient: addressTo ? addressTo : this.state.flowRollerAddress,
           flowRate: amount
         };
 
@@ -151,24 +168,33 @@ class App extends Component {
     this.setState({flowRoller, flowRollerAddress: address});
   }
 
-  depositAmountToAAVE(amount) {
+  async depositAmountToAAVE(amount) {
     if (this.state.flowRoller) {
       console.log(`depositing to AAVE...${this.state.flowRollerAddress}`);
 
-      this.state.flowRoller.methods._depositBalance().send({
+      await this.state.flowRoller.methods._depositBalance().send({
         from: this.state.account,
       });
     }
   }
 
-  withdrawFromAAVE(amount) {
-    if (this.state.flowRoller) {
-      console.log(`withdrawing from AAVE...`);
+  async withdrawFromAAVE(amount) {
+    if (this.state.aDaiBalance > 0) {
+      if (this.state.flowRoller) {
+        amount = this.state.web3.utils.toWei(this.state.aDaiBalance,'ether');
+        console.log(`withdrawing from AAVE...${amount}`);
 
-      this.state.flowRoller.methods._withdraw().send({
-        from: this.state.account,
-      });
+        await this.state.aDai.methods.approve(this.state.flowRollerAddress, amount).send({ from: this.state.account });
+
+        let withdrawn = await this.state.flowRoller.methods._withdraw(amount, aDAI_KOVAN_ADDRESS).send({
+          from: this.state.account,
+        });
+
+        console.log(`withdrawn...${withdrawn}`);
+      }
     }
+
+
   }
 
   async getDaix(amount) {
@@ -178,7 +204,6 @@ class App extends Component {
     console.log('Minting and upgrading...');
     await dai.mint(this.state.account, amount.toString(), { from: this.state.account });
     await dai.approve(this.state.daix.address, amount.toString(), { from: this.state.account });
-    // await dai.methods.approve(this.state.daix.address, amount.toString()).send({ from: this.state.account });
     await this.state.daix.upgrade(amount.toString(), { from: this.state.account });
     console.log('Done minting and upgrading.');
     // let daixBalance = await this.state.daix.balanceOf(this.state.account);
@@ -229,6 +254,7 @@ class App extends Component {
           <h2>Connected address: {this.state.account}</h2>
           <h2>ETH Balance: {this.state.ethBalance}</h2>
           <h2>DAIx Balance: {this.state.daixBalance}</h2>
+          <h2>aDAI Balance: {this.state.aDaiBalance}</h2>
           <h2>DAI Balance: {this.state.daiBalance}</h2>
           <br></br>
           <div className="row">
@@ -281,7 +307,7 @@ class App extends Component {
                         ref={(input) => { this.getAmount = input }}
                       />
                       </div>
-                      <button type='submit' className='btn btn-primary'>Upgrade</button>
+                      <button type='submit' className='btn btn-primary'>Generate</button>
                     </form>
                   </div>
                   <div>
@@ -315,7 +341,9 @@ class App extends Component {
                     <form onSubmit={(e) => {
                       e.preventDefault();
                       let sendAmount = this.sendAmount.value;
-                      this.streamEthxToAddress(sendAmount);
+                      let addressTo = this.addressTo.value;
+
+                      this.streamEthxToAddress(sendAmount, addressTo);
                     }}>
                       <div className='form-group mr-sm-2'>
                       <br></br>
@@ -328,6 +356,14 @@ class App extends Component {
                         placeholder='send amount...'
                         required
                         ref={(input) => { this.sendAmount = input }}
+                      />
+                      <input
+                        id='address'
+                        type='text'
+                        className='form-control form-control-md'
+                        placeholder='address...'
+                        required
+                        ref={(input) => { this.addressTo = input }}
                       />
                       </div>
                       <button type='submit' className='btn btn-primary'>Stream</button>
@@ -358,7 +394,7 @@ class App extends Component {
                         ref={(input) => { this.depositAmount = input }}
                       />
                       </div>
-                      <button type='submit' className='btn btn-primary'>Stream</button>
+                      <button type='submit' className='btn btn-primary'>Deposit</button>
                     </form>
                   </div>
                   <div>
@@ -386,7 +422,7 @@ class App extends Component {
                         ref={(input) => { this.withdrawAmount = input }}
                       />
                       </div>
-                      <button type='submit' className='btn btn-primary'>Stream</button>
+                      <button type='submit' className='btn btn-primary'>Withdraw</button>
                     </form>
                   </div>
                   <div>
