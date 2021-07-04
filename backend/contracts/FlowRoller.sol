@@ -34,9 +34,7 @@ import
 {
     IUniswapV2Router02
 } from "@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
-// import {
-//     IUniswapV2Router02
-// } from "../interfaces/IUniswapV2Router02.sol";
+
 import {
     ERC20
 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
@@ -52,7 +50,8 @@ contract FlowRoller is SuperAppBase {
     struct Saver {
         uint256 timestamp;
         int96 flowRate;
-        uint256 prevAccumulatedBalance;
+        uint256 depositableBalance;
+        uint256 totalStreamed;
         bool isTerminated;
     }
 
@@ -124,7 +123,7 @@ contract FlowRoller is SuperAppBase {
         console.log("updatedFlowRate");
         console.logInt(flowRate);
 
-        // _getBalance(from);
+        // _getDepositableBalance(from);
 
         savers[from].timestamp = timestamp;
         savers[from].flowRate = flowRate;
@@ -160,13 +159,18 @@ contract FlowRoller is SuperAppBase {
         console.log("updatedFlowRate");
         console.logInt(updatedFlowRate);
 
-        uint256 newAccumulatedBalance = _getBalance(from, updatedTimestamp);
+        uint256 newDepositableBalance = _getDepositableBalance(from, updatedTimestamp);
+        uint256 newTotalStreamed = _getTotalStreamed(from, updatedTimestamp);
 
-        console.log("prevAccumulatedBalance");
-        console.logUint(newAccumulatedBalance);
+        console.log("depositableBalance");
+        console.logUint(newDepositableBalance);
+
+        console.log("totalStreamed");
+        console.logUint(newTotalStreamed);
 
         // Update balance
-        savers[from].prevAccumulatedBalance = newAccumulatedBalance;
+        savers[from].depositableBalance = newDepositableBalance;
+        savers[from].totalStreamed = newTotalStreamed;
 
         // Update other properties
         savers[from].timestamp = updatedTimestamp;
@@ -179,7 +183,7 @@ contract FlowRoller is SuperAppBase {
         uint256 checkpoint = block.timestamp;
         console.log("msg.sender: ");
         console.log(msg.sender);
-        uint256 balanceAtCheckpoint = _getBalance(msg.sender, checkpoint);
+        uint256 balanceAtCheckpoint = _getDepositableBalance(msg.sender, checkpoint);
         console.log("balanceAtCheckpoint: ");
         console.logUint(balanceAtCheckpoint);
 
@@ -188,16 +192,6 @@ contract FlowRoller is SuperAppBase {
         int amount = -1;
         console.log("amount: ");
         console.logInt(amount);
-
-        // if (amount > -1) {
-        //     savers[msg.sender].timestamp = checkpoint;
-        //     savers[msg.sender].prevAccumulatedBalance = balanceAtCheckpoint.sub(uint256(amount));
-        //     amountToDeposit = uint256(amount);
-        // }
-        // else {
-        //     savers[msg.sender].timestamp = checkpoint;
-        //     savers[msg.sender].prevAccumulatedBalance = 0;
-        // }
 
         console.log("_superToken symbol: " );
         console.log(ISuperToken(_superToken).name());
@@ -217,22 +211,11 @@ contract FlowRoller is SuperAppBase {
         console.log("underlyingToken balance: ");
         console.logUint(underlyingTokenBalance);
 
-        // console.log("_outputToken: ");
-        // console.logAddress(ERC20(_outputToken).name());
-
-        uint256 minTradeAmount = amountToDeposit.sub(amountToDeposit.div(200));
-        uint256 deadline = block.timestamp.add(1200); // 20 minutes
-
-        console.log("minTradeAmount");
-        console.logUint(minTradeAmount);
-
         uint swapOutputAmount = _swap(
             ERC20(underlyingToken),
             address(_outputToken),
             address(this),
-            amountToDeposit,
-            minTradeAmount,
-            deadline
+            amountToDeposit
         );
 
         console.log("swapOutputAmount");
@@ -255,59 +238,116 @@ contract FlowRoller is SuperAppBase {
             0);
 
         savers[msg.sender].timestamp = checkpoint;
-        savers[msg.sender].prevAccumulatedBalance = 0;
+        savers[msg.sender].depositableBalance = 0;
     }
 
-    function _withdraw() 
+    function _withdraw(
+        uint amount,
+        address aTokenAddress
+    ) 
         public 
-        returns(uint256 withdrawn)
+        returns(uint256 swapOutputAmount)
     {
-        // check how much in AAVE
-        // IF > 0, withdraw all on behalf of msg.sender
+        console.log("amount requested to withdraw: ");
+        console.logUint(amount);
+
+        console.log("aToken balance for msg.sender: ");
+        console.logUint(ERC20(aTokenAddress).balanceOf(msg.sender));
+
+        console.log("allowance to spend tokens:");
+        console.logUint(ERC20(aTokenAddress).allowance(msg.sender, address(this)));
+    
+        ERC20(aTokenAddress).transferFrom(msg.sender, address(this), amount);
+
         ILendingPool lendingPool = ILendingPool(_aaveLendingPoolProvider.getLendingPool());
-        withdrawn = lendingPool.withdraw(address(_outputToken), type(uint).max, msg.sender);
+        uint256 withdrawn = lendingPool.withdraw(address(_outputToken), type(uint).max, address(this));
 
         console.log("withdrawn");
         console.logUint(withdrawn);
 
-        return withdrawn;
+        address underlyingToken = ISuperToken(_superToken).getUnderlyingToken();
+
+        console.log("underlyingToken balance: ");
+        console.logUint(ERC20(underlyingToken).balanceOf(address(this)));
+
+        swapOutputAmount = _swap(
+            _outputToken,
+            underlyingToken,
+            address(this),
+            amount
+        );
+
+        console.log("swapOutputAmount");
+        console.logUint(swapOutputAmount);
+
+        console.log("underlyingToken balance after swap: ");
+        console.logUint(ERC20(underlyingToken).balanceOf(address(this)));
+
+        ERC20(underlyingToken).safeIncreaseAllowance(address(_superToken), swapOutputAmount);
+
+        ISuperToken(_superToken).upgrade(swapOutputAmount);
+
+        ISuperToken(_superToken).transfer(msg.sender, swapOutputAmount);
+
+        return swapOutputAmount;
     }
 
-    function _getBalance(
+    function _getDepositableBalance(
         address from,
         uint256 timestamp)
         private
-        view
-        returns(uint256 balance)
+        returns(uint256)
     {     
         int96 prevFlowRate = savers[from].flowRate;
         uint256 prevTimestamp = savers[from].timestamp;
         uint256 timeDelta = timestamp.sub(prevTimestamp);
-        uint256 newAccumulatedBalance = savers[from].prevAccumulatedBalance.add(timeDelta.mul(uint256(prevFlowRate)));
+        uint256 newDepositableBalance = savers[from].depositableBalance.add(timeDelta.mul(uint256(prevFlowRate)));
 
-        return newAccumulatedBalance;
+        return newDepositableBalance;
     }
+
+    function _getTotalStreamed(
+        address from,
+        uint256 timestamp)
+        private
+        returns(uint256)
+    {
+        int96 prevFlowRate = savers[from].flowRate;
+        uint256 prevTimestamp = savers[from].timestamp;
+        uint256 timeDelta = timestamp.sub(prevTimestamp);
+        uint256 newTotalStreamed = savers[from].totalStreamed.add(timeDelta.mul(uint256(prevFlowRate)));
+        console.log('newTotalStreamed');
+        console.logUint(newTotalStreamed);
+
+        return newTotalStreamed;
+    }
+
+    function _totalStreamedOf(
+        address saver)
+        public
+        returns (uint256)
+    {
+        return _getTotalStreamed(saver, block.timestamp);
+    } 
 
     function _swap(
         ERC20 inputToken,
         address outputToken,
         address to,
-        uint256 amount,
-        uint256 minOutput,
-        uint256 deadline
+        uint256 amount
     ) private returns(uint) {        
         address[] memory path = new address[](2);
         path[0] = address(inputToken);
         path[1] = outputToken;
 
+        uint256 minTradeAmount = amount.sub(amount.div(200));
+        uint256 deadline = block.timestamp.add(1200); // 20 minutes
+
+        console.log("minTradeAmount");
+        console.logUint(minTradeAmount);
+
         // approve the router to spend
         inputToken.safeIncreaseAllowance(address(_uniswapRouter), amount);
-
-        console.log("_uniswapRouter");
-        console.logAddress(address(_uniswapRouter));
-
-        console.log("amount");
-        console.logUint(amount);
 
         console.log("path[0]");
         console.logAddress(path[0]);
@@ -315,16 +355,9 @@ contract FlowRoller is SuperAppBase {
         console.log("path[1]");
         console.logAddress(path[1]);
 
-        console.log("block.timestamp");
-        console.logUint(block.timestamp);
-
-        console.log("deadline");
-        console.logUint(deadline);
-        // inputToken.safeApprove(address(_uniswapRouter), uint256(-1));
-
         uint[] memory amounts = IUniswapV2Router02(_uniswapRouter).swapExactTokensForTokens(
             amount,
-            minOutput,
+            minTradeAmount,
             path,
             to,
             deadline
