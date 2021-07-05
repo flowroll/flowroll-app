@@ -29,6 +29,7 @@ class App extends Component {
       totalOutFlow: 0,
       balance: 0,
       aDaiBalance: undefined,
+      aDaiBalanceWei: undefined,
       aDai: null,
       flowRoller: null,
       flowRollerAddress: null,
@@ -129,7 +130,7 @@ class App extends Component {
     let totalStreamed = web3.utils.fromWei(totalStreamedWei);
     console.log('totalStreamed:', totalStreamed)
 
-    this.setState({balance, aDaiBalance, totalStreamed});
+    this.setState({balance, aDaiBalance, aDaiBalanceWei, totalStreamed});
 
   }
 
@@ -206,7 +207,7 @@ class App extends Component {
   withdrawFromAAVE = async () =>  {
     if (this.state.aDaiBalance > 0) {
       if (this.state.flowRoller) {
-        let amount = this.state.aDaiBalance.toString();
+        let amount = this.state.aDaiBalanceWei.toString();
         console.log(`withdrawing from AAVE...${amount}`);
 
         await this.state.aDai.methods.approve(this.state.flowRollerAddress, amount).send({ from: this.state.account });
