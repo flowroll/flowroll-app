@@ -62,6 +62,14 @@ function Main(props) {
       </Card>
     ))
   }
+  const getHeading = () => {
+    if (props.outFlows.some(flow => flow.isSavings)) {
+      return "Edit your savings flow";
+    }
+    else {
+      return "Add a new savings flow";
+    }
+  }
 
   const getIcon = () => {
     if (props.outFlows.some(flow => flow.isSavings)) {
@@ -83,7 +91,7 @@ function Main(props) {
 
   return (
     <div className="main">
-      <h1 className="flows-title">Flows</h1>
+      <h1 className="flows-title">{getHeading()}</h1>
       <span className="add-box-icon" title={getTitle()} onClick={()=> setModalOpen(!modalOpen)}>{getIcon()}</span>
       <ModalAddOrEditFlow 
         currUser={props.currUser} 

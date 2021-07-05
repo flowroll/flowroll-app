@@ -1,5 +1,5 @@
 import './Header.scss';
-import logo from '../logo.svg';
+import logo from '../flowroll_logo.png';
 import { useState } from 'react';
 
 function Header(props) {
